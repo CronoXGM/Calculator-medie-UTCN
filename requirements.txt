@@ -1,3 +1,5 @@
+scrapy
+pdfplumber
 requests
 playwright
 PyPDF2
