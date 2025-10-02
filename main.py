@@ -1,14 +1,16 @@
 import os
 import platform
 import re
-import scrapy
-from scrapy.crawler import CrawlerProcess
-import pdfplumber
 from io import BytesIO
 from urllib.parse import quote
 
+import pdfplumber
+import scrapy
+from scrapy.crawler import CrawlerProcess
+
 # Global list to store courses extracted from the PDF.
 scraped_courses = []
+
 
 def clear_console():
     """Clear the terminal screen."""
@@ -17,9 +19,10 @@ def clear_console():
     else:
         os.system("clear")
 
+
 class CurriculumPDFSpider(scrapy.Spider):
-    name = 'curriculum_pdf'
-    
+    name = "curriculum_pdf"
+
     def __init__(self, study_year, specialization, **kwargs):
         """
         study_year: string representing a number from 1 to 4.
@@ -27,23 +30,25 @@ class CurriculumPDFSpider(scrapy.Spider):
         """
         self.study_year = study_year.strip()
         self.specialization = specialization.strip().upper()
-        self.academic_year = "2024-2025"  # Hardcoded academic year as per the URL pattern.
+        self.academic_year = (
+            "2024-2025"  # Hardcoded academic year as per the URL pattern.
+        )
         super().__init__(**kwargs)
-        
+
     def start_requests(self):
         # Mapping from specialization to the string used in the URL.
         spec_map = {
             "CTI": "Calcro",
             "CTI_EN": "Caleng(eng)",
             "AU": "AIA_RO",
-            "AU_EN": "AIA_EN(eng)"
+            "AU_EN": "AIA_EN(eng)",
         }
         if self.specialization not in spec_map:
             self.logger.error(
                 f"Invalid specialization: {self.specialization}. Must be CTI, CTI_EN, AU, or AU_EN."
             )
             return
-        
+
         try:
             year_int = int(self.study_year)
             if year_int < 1 or year_int > 4:
@@ -52,7 +57,7 @@ class CurriculumPDFSpider(scrapy.Spider):
         except ValueError:
             self.logger.error("Study year must be an integer.")
             return
-        
+
         spec_value = spec_map[self.specialization]
         raw_url = (
             f"https://ac.utcluj.ro/files/Acasa/Site/documente/planuri_invatamant/"
@@ -61,14 +66,16 @@ class CurriculumPDFSpider(scrapy.Spider):
         # Encode URL so that special characters (like parentheses) are handled.
         encoded_url = quote(raw_url, safe=":/")
         self.logger.info(f"Fetching PDF from: {encoded_url}")
-        
+
         # Use headers to mimic a browser.
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36",
-            "Referer": "https://ac.utcluj.ro/planuri-de-invatamant.html"
+            "Referer": "https://ac.utcluj.ro/planuri-de-invatamant.html",
         }
-        yield scrapy.Request(encoded_url, callback=self.parse_pdf, headers=headers, dont_filter=True)
-        
+        yield scrapy.Request(
+            encoded_url, callback=self.parse_pdf, headers=headers, dont_filter=True
+        )
+
     def parse_pdf(self, response):
         self.logger.info("PDF downloaded. Extracting table data using pdfplumber...")
         pdf_file = BytesIO(response.body)
@@ -87,14 +94,16 @@ class CurriculumPDFSpider(scrapy.Spider):
                             clean_row = [cell.strip() if cell else "" for cell in row]
                             if not any(clean_row):
                                 continue  # Skip completely empty rows.
-                            
+
                             # Skip header rows or totals.
-                            if ("CODUL" in clean_row[0].upper()) or ("TOTAL" in clean_row[0].upper()):
+                            if ("CODUL" in clean_row[0].upper()) or (
+                                "TOTAL" in clean_row[0].upper()
+                            ):
                                 continue
-                            
+
                             course_info = None
                             credits_str = None
-                            
+
                             # Depending on the table structure, choose the proper columns.
                             if len(clean_row) >= 9:
                                 # For tables with 9 columns, assume:
@@ -110,20 +119,21 @@ class CurriculumPDFSpider(scrapy.Spider):
                                 credits_str = clean_row[5]
                             else:
                                 continue  # Unexpected format, skip row.
-                            
+
                             try:
                                 credits_val = float(credits_str)
                             except ValueError:
-                                self.logger.info(f"Skipping row due to credits conversion error: {clean_row}")
+                                self.logger.info(
+                                    f"Skipping row due to credits conversion error: {clean_row}"
+                                )
                                 continue
-                            
-                            courses.append({
-                                'course': course_info,
-                                'credits': credits_val
-                            })
+
+                            courses.append(
+                                {"course": course_info, "credits": credits_val}
+                            )
         except Exception as e:
             self.logger.error(f"Error processing PDF: {e}")
-        
+
         if courses:
             for course in courses:
                 scraped_courses.append(course)
@@ -131,21 +141,28 @@ class CurriculumPDFSpider(scrapy.Spider):
         else:
             self.logger.error("No course data was extracted from the PDF.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Ask the user for study year and specialization.
     study_year = input("Enter your study year (1-4): ").strip()
-    specialization = input("Enter your specialization (CTI, CTI_EN, AU, AU_EN): ").strip()
-    
+    specialization = input(
+        "Enter your specialization (CTI, CTI_EN, AU, AU_EN): "
+    ).strip()
+
     # Run the spider.
-    process = CrawlerProcess(settings={
-        "LOG_LEVEL": "INFO",
-    })
-    process.crawl(CurriculumPDFSpider, study_year=study_year, specialization=specialization)
+    process = CrawlerProcess(
+        settings={
+            "LOG_LEVEL": "INFO",
+        }
+    )
+    process.crawl(
+        CurriculumPDFSpider, study_year=study_year, specialization=specialization
+    )
     process.start()  # This will block until the spider finishes.
-    
+
     # Clear the console to remove the log output.
     clear_console()
-    
+
     # After the crawl, if courses were extracted, ask the user for grades and compute the weighted harmonic mean.
     if scraped_courses:
         print("\nCourses extracted from the curriculum:")
@@ -153,7 +170,7 @@ if __name__ == '__main__':
         valid_total_credits = 0.0  # Sum of credits for courses with a nonzero grade.
         for course in scraped_courses:
             # Remove any leading course code (e.g., "1.00") from the course info.
-            course_name = re.sub(r'^\d+(\.\d+)?\s+', '', course['course'])
+            course_name = re.sub(r"^\d+(\.\d+)?\s+", "", course["course"])
             print(f"Subject: {course_name} (Credits: {course['credits']})")
             while True:
                 grade_input = input(f"Enter your grade for '{course_name}': ").strip()
@@ -164,20 +181,30 @@ if __name__ == '__main__':
                     print("Please enter a valid numeric grade.")
             # Only count this course if the grade is nonzero.
             if grade_val >= 5:
-                user_grades.append((grade_val, course['credits']))
-                valid_total_credits += course['credits']
+                credits_val = course["credits"]
+                if credits_val <= 0:
+                    print(
+                        f"Skipping {course_name} because it has zero or negative credits."
+                    )
+                    continue
+                user_grades.append((grade_val, credits_val))
+                valid_total_credits += credits_val
             else:
-                print(f"Skipping {course_name} in the harmonic mean calculation (grade is below 5).")
-        
+                print(
+                    f"Skipping {course_name} in the harmonic mean calculation (grade is below 5)."
+                )
+
         # Compute the weighted harmonic mean using only courses with nonzero grades.
-        denominator = 0.0
+        ratio_sum = 0.0
         for grade, credits in user_grades:
-            denominator += credits / grade
-        
-        if denominator == 0:
-            print("No valid (nonzero) grades were provided to compute the harmonic mean.")
+            ratio_sum += grade / credits
+
+        if ratio_sum == 0 or valid_total_credits == 0:
+            print(
+                "No valid (nonzero) grades were provided to compute the harmonic mean."
+            )
         else:
-            harmonic_mean = valid_total_credits / denominator
+            harmonic_mean = ratio_sum / valid_total_credits
             print(f"\nThe harmonic mean grade for the semester is: {harmonic_mean:.2f}")
     else:
         print("No courses were scraped. Please check the PDF source or your inputs.")
