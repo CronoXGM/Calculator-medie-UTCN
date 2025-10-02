@@ -5,7 +5,7 @@ A Python tool for scraping course information from UTCN (Technical University of
 ## Features
 
 - 📚 **Curriculum Scraping**: Automatically downloads and extracts course data from official UTCN curriculum PDF files
-- 🧮 **Grade Calculator**: Computes weighted harmonic mean of student grades based on course credits
+- 🧮 **Grade Calculator**: Computes mean grade using a credit-weighted formula
 - 🎯 **Multiple Specializations**: Supports CTI, CTI_EN, AU, and AU_EN specializations
 - 📊 **Academic Year Support**: Currently configured for 2024-2025 academic year
 - 🔍 **Intelligent PDF Parsing**: Uses pdfplumber for accurate table extraction from PDF documents
@@ -66,7 +66,7 @@ Enter your grade for 'Programare Orientată pe Obiecte': 8.7
 
 ...
 
-The harmonic mean grade for the semester is: 8.95
+The mean grade for the semester is: 8.95
 ```
 
 ## How It Works
@@ -75,10 +75,10 @@ The harmonic mean grade for the semester is: 8.95
 2. **Data Extraction**: Uses Scrapy to download and pdfplumber to parse the PDF tables
 3. **Course Processing**: Extracts course names and credit values from the curriculum
 4. **Grade Input**: Prompts user to enter grades for each course
-5. **Calculation**: Computes the weighted harmonic mean using the formula:
+5. **Calculation**: Computes the mean grade using the formula:
 
    ```
-   Harmonic Mean = Total Credits / Σ(Credits_i / Grade_i)
+   Mean Grade = Σ(Grade_i / Credits_i) / Total Credits
    ```
 
 ## Technical Details
@@ -101,8 +101,9 @@ https://ac.utcluj.ro/files/Acasa/Site/documente/planuri_invatamant/
 
 ### Grade Filtering
 
-- Only grades ≥ 5.0 are included in the harmonic mean calculation
+- Only grades ≥ 5.0 are included in the mean calculation
 - Courses with grades below 5.0 are automatically excluded
+- Courses with zero or negative credits are skipped
 - The calculation uses only credits from courses with valid grades
 
 ## Project Structure
