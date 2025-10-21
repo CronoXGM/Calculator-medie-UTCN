@@ -19,6 +19,10 @@ A Python tool for scraping course information from UTCN (Technical University of
 | `AU` | Automatică (Romanian) | Romanian |
 | `AU_EN` | Automatică (English) | English |
 
+**Note for Automatica (AU/AU_EN):**
+- Year 1 uses the curriculum from "Automatică, Informatică Aplicată și Sisteme Inteligente" (AIAIS)
+- Years 2-4 use the curriculum from "Ingineria Sistemelor" (IS)
+
 ## Installation
 
 1. Clone the repository:
@@ -98,6 +102,17 @@ The tool fetches curriculum PDFs from:
 https://ac.utcluj.ro/files/Acasa/Site/documente/planuri_invatamant/
 {academic_year}/{year}_L_{specialization}_{academic_year}.pdf
 ```
+
+**Specialization URL Mappings:**
+
+| Specialization | Year | URL Code | Program Name |
+|----------------|------|----------|--------------|
+| CTI (Romanian) | All | `Calcro` | Calculatoare |
+| CTI_EN (English) | All | `Caleng(eng)` | Calculatoare |
+| AU (Romanian) | 1 | `AIAIS_RO` | Automatică, Informatică Aplicată și Sisteme Inteligente |
+| AU (Romanian) | 2-4 | `IS_RO` | Ingineria Sistemelor |
+| AU_EN (English) | 1 | `AIAIS_EN(eng)` | Automatică, Informatică Aplicată și Sisteme Inteligente |
+| AU_EN (English) | 2-4 | `IS_EN(eng)` | Ingineria Sistemelor |
 
 ### Grade Filtering
 
