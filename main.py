@@ -36,14 +36,7 @@ class CurriculumPDFSpider(scrapy.Spider):
         super().__init__(**kwargs)
 
     def start_requests(self):
-        # Mapping from specialization to the string used in the URL.
-        spec_map = {
-            "CTI": "Calcro",
-            "CTI_EN": "Caleng(eng)",
-            "AU": "AIA_RO",
-            "AU_EN": "AIA_EN(eng)",
-        }
-        if self.specialization not in spec_map:
+        if self.specialization not in ["CTI", "CTI_EN", "AU", "AU_EN"]:
             self.logger.error(
                 f"Invalid specialization: {self.specialization}. Must be CTI, CTI_EN, AU, or AU_EN."
             )
@@ -58,7 +51,18 @@ class CurriculumPDFSpider(scrapy.Spider):
             self.logger.error("Study year must be an integer.")
             return
 
-        spec_value = spec_map[self.specialization]
+        # Mapping from specialization to the string used in the URL.
+        # For Automatica (AU/AU_EN), the mapping depends on the year:
+        # - Year 1: Uses AIAIS (Automatică, Informatică Aplicată și Sisteme Inteligente)
+        # - Years 2-4: Uses IS (Ingineria Sistemelor)
+        if self.specialization == "AU":
+            spec_value = "AIAIS_RO" if year_int == 1 else "IS_RO"
+        elif self.specialization == "AU_EN":
+            spec_value = "AIAIS_EN(eng)" if year_int == 1 else "IS_EN(eng)"
+        elif self.specialization == "CTI":
+            spec_value = "Calcro"
+        else:  # CTI_EN
+            spec_value = "Caleng(eng)"
         raw_url = (
             f"https://ac.utcluj.ro/files/Acasa/Site/documente/planuri_invatamant/"
             f"{self.academic_year}/{year_int}_L_{spec_value}_{self.academic_year}.pdf"
