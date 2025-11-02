@@ -3,3 +3,4 @@ pdfplumber
 requests
 playwright
 PyPDF2
+questionary
