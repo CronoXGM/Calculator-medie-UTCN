@@ -1,14 +1,14 @@
 """
 UTCN Grade Calculator - Main Entry Point
 
-A modular application to calculate weighted harmonic mean grades
+A modular application to calculate weighted arithmetic mean grades
 for UTCN (Technical University of Cluj-Napoca) students.
 
 This application:
 1. Scrapes course data from UTCN curriculum PDFs
 2. Allows interactive subject selection via checkboxes
 3. Collects grades for selected subjects
-4. Calculates weighted harmonic mean with special handling for failing grades
+4. Calculates weighted arithmetic mean (standard grade average)
 """
 import sys
 from typing import List
@@ -71,8 +71,8 @@ def main():
             display_error("No grades were entered.")
             return 1
 
-        # Step 5: Calculate weighted harmonic mean
-        print("\nStep 5: Calculating your weighted harmonic mean grade...\n")
+        # Step 5: Calculate weighted arithmetic mean
+        print("\nStep 5: Calculating your weighted average grade...\n")
         result = calculate_weighted_harmonic_mean(graded_courses)
 
         # Step 6: Display results
