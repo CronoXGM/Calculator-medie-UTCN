@@ -1,93 +1,149 @@
-"""
-UTCN Grade Calculator - Main Entry Point
+import os
+import platform
+import re
+from io import BytesIO
+from urllib.parse import quote
 
-A modular application to calculate weighted harmonic mean grades
-for UTCN (Technical University of Cluj-Napoca) students.
+import pdfplumber
+import scrapy
+from scrapy.crawler import CrawlerProcess
 
-This application:
-1. Scrapes course data from UTCN curriculum PDFs
-2. Allows interactive subject selection via checkboxes
-3. Collects grades for selected subjects
-4. Calculates weighted harmonic mean with special handling for failing grades
-"""
-import sys
-from typing import List
-
-from models import Course
-from pdf_handler import scrape_subjects
-from grade_calculator import calculate_weighted_harmonic_mean
-from ui_handler import (
-    display_welcome,
-    display_error,
-    get_study_year,
-    get_specialization,
-    select_subjects_interactive,
-    collect_grades,
-    display_results,
-    clear_console,
-)
+# Global list to store courses extracted from the PDF.
+scraped_courses = []
 
 
-def main():
-    """Main application entry point."""
-    try:
-        # Display welcome message
-        display_welcome()
+def clear_console():
+    """Clear the terminal screen."""
+    if platform.system() == "Windows":
+        os.system("cls")
+    else:
+        os.system("clear")
 
-        # Step 1: Get user input for year and specialization
-        print("Step 1: Enter your academic information\n")
-        study_year = get_study_year()
-        specialization = get_specialization()
 
-        # Step 2: Scrape subjects from PDF
-        print(f"\nStep 2: Fetching curriculum for Year {study_year}, {specialization}...")
-        print("This may take a few moments...\n")
+class CurriculumPDFSpider(scrapy.Spider):
+    name = "curriculum_pdf"
 
-        courses = scrape_subjects(study_year, specialization)
+    def __init__(self, study_year, specialization, **kwargs):
+        """
+        study_year: string representing a number from 1 to 4.
+        specialization: one of the following: CTI, CTI_EN, AU, AU_EN.
+        """
+        self.study_year = study_year.strip()
+        self.specialization = specialization.strip().upper()
+        self.academic_year = (
+            "2024-2025"  # Hardcoded academic year as per the URL pattern.
+        )
+        super().__init__(**kwargs)
 
-        if not courses:
-            display_error("No courses were found in the curriculum PDF.")
-            display_error("Please check your year and specialization, or try again later.")
-            return 1
+    def start_requests(self):
+        if self.specialization not in ["CTI", "CTI_EN", "AU", "AU_EN"]:
+            self.logger.error(
+                f"Invalid specialization: {self.specialization}. Must be CTI, CTI_EN, AU, or AU_EN."
+            )
+            return
 
-        # Clear console to remove scrapy logs
-        clear_console()
-        display_welcome()
-        print(f"✓ Successfully loaded {len(courses)} courses from curriculum\n")
+        try:
+            year_int = int(self.study_year)
+            if year_int < 1 or year_int > 4:
+                self.logger.error("Study year must be between 1 and 4.")
+                return
+        except ValueError:
+            self.logger.error("Study year must be an integer.")
+            return
 
-        # Step 3: Let user select subjects they are taking
-        print("Step 3: Select the subjects you are taking this semester\n")
-        selected_courses = select_subjects_interactive(courses)
+        # Mapping from specialization to the string used in the URL.
+        # For Automatica (AU/AU_EN), the mapping depends on the year:
+        # - Year 1: Uses AIAIS (Automatică, Informatică Aplicată și Sisteme Inteligente)
+        # - Years 2-4: Uses IS (Ingineria Sistemelor)
+        if self.specialization == "AU":
+            spec_value = "AIAIS_RO" if year_int == 1 else "IS_RO"
+        elif self.specialization == "AU_EN":
+            spec_value = "AIAIS_EN(eng)" if year_int == 1 else "IS_EN(eng)"
+        elif self.specialization == "CTI":
+            spec_value = "Calcro"
+        else:  # CTI_EN
+            spec_value = "Caleng(eng)"
+        raw_url = (
+            f"https://ac.utcluj.ro/files/Acasa/Site/documente/planuri_invatamant/"
+            f"{self.academic_year}/{year_int}_L_{spec_value}_{self.academic_year}.pdf"
+        )
+        # Encode URL so that special characters (like parentheses) are handled.
+        encoded_url = quote(raw_url, safe=":/")
+        self.logger.info(f"Fetching PDF from: {encoded_url}")
 
-        if not selected_courses:
-            print("\nNo subjects selected. Exiting...")
-            return 0
+        # Use headers to mimic a browser.
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0 Safari/537.36",
+            "Referer": "https://ac.utcluj.ro/planuri-de-invatamant.html",
+        }
+        yield scrapy.Request(
+            encoded_url, callback=self.parse_pdf, headers=headers, dont_filter=True
+        )
 
-        # Step 4: Collect grades for selected subjects
-        print(f"\nStep 4: Enter grades for your {len(selected_courses)} selected subject(s)\n")
-        graded_courses = collect_grades(selected_courses)
+    def parse_pdf(self, response):
+        self.logger.info("PDF downloaded. Extracting table data using pdfplumber...")
+        pdf_file = BytesIO(response.body)
+        courses = []
+        try:
+            with pdfplumber.open(pdf_file) as pdf:
+                for page in pdf.pages:
+                    tables = page.extract_tables()
+                    if not tables:
+                        continue
+                    for table in tables:
+                        self.logger.info("Extracted table: " + str(table))
+                        for row in table:
+                            self.logger.info("Row: " + str(row))
+                            # Clean each row: replace None with empty string and strip whitespace.
+                            clean_row = [cell.strip() if cell else "" for cell in row]
+                            if not any(clean_row):
+                                continue  # Skip completely empty rows.
 
-        if not graded_courses:
-            display_error("No grades were entered.")
-            return 1
+                            # Skip header rows or totals.
+                            if ("CODUL" in clean_row[0].upper()) or (
+                                "TOTAL" in clean_row[0].upper()
+                            ):
+                                continue
 
-        # Step 5: Calculate weighted harmonic mean
-        print("\nStep 5: Calculating your weighted harmonic mean grade...\n")
-        result = calculate_weighted_harmonic_mean(graded_courses)
+                            course_info = None
+                            credits_str = None
 
-        # Step 6: Display results
-        display_results(result)
+                            # Depending on the table structure, choose the proper columns.
+                            if len(clean_row) >= 9:
+                                # For tables with 9 columns, assume:
+                                # - Column 0: course code + subject name
+                                # - Column 7: credits (as a string convertible to float)
+                                course_info = clean_row[0]
+                                credits_str = clean_row[7]
+                            elif len(clean_row) >= 7:
+                                # For tables with 7 columns, assume:
+                                # - Column 0: course code + subject name
+                                # - Column 5: credits
+                                course_info = clean_row[0]
+                                credits_str = clean_row[5]
+                            else:
+                                continue  # Unexpected format, skip row.
 
-        return 0
+                            try:
+                                credits_val = float(credits_str)
+                            except ValueError:
+                                self.logger.info(
+                                    f"Skipping row due to credits conversion error: {clean_row}"
+                                )
+                                continue
 
-    except KeyboardInterrupt:
-        print("\n\nOperation cancelled by user. Exiting...")
-        return 0
-    except Exception as e:
-        display_error(f"An unexpected error occurred: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return 1
+                            courses.append(
+                                {"course": course_info, "credits": credits_val}
+                            )
+        except Exception as e:
+            self.logger.error(f"Error processing PDF: {e}")
+
+        if courses:
+            for course in courses:
+                scraped_courses.append(course)
+                yield course
+        else:
+            self.logger.error("No course data was extracted from the PDF.")
 
 
 if __name__ == "__main__":
