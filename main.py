@@ -35,7 +35,7 @@ class CurriculumPDFSpider(scrapy.Spider):
         )
         super().__init__(**kwargs)
 
-    def start_requests(self):
+    async def start(self):
         if self.specialization not in ["CTI", "CTI_EN", "AU", "AU_EN"]:
             self.logger.error(
                 f"Invalid specialization: {self.specialization}. Must be CTI, CTI_EN, AU, or AU_EN."

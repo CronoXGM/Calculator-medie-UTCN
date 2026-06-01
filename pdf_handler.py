@@ -36,7 +36,7 @@ class CurriculumPDFSpider(scrapy.Spider):
         self.academic_year = "2024-2025"  # Hardcoded academic year
         super().__init__(**kwargs)
 
-    def start_requests(self):
+    async def start(self):
         """Generate the initial request to download the PDF."""
         # Mapping from specialization to URL string
         spec_map = {
@@ -79,8 +79,17 @@ class CurriculumPDFSpider(scrapy.Spider):
             "Referer": "https://ac.utcluj.ro/planuri-de-invatamant.html",
         }
         yield scrapy.Request(
-            encoded_url, callback=self.parse_pdf, headers=headers, dont_filter=True
+            encoded_url,
+            callback=self.parse_pdf,
+            errback=self.errback_pdf,
+            headers=headers,
+            dont_filter=True,
+            meta={"handle_httpstatus_list": [403, 404, 500]},
         )
+
+    def errback_pdf(self, failure):
+        """Handle request failures."""
+        self.logger.error(f"Request failed: {failure.value}")
 
     def parse_pdf(self, response):
         """
@@ -89,6 +98,14 @@ class CurriculumPDFSpider(scrapy.Spider):
         Args:
             response: The Scrapy response containing the PDF data
         """
+        if response.status != 200:
+            self.logger.error(
+                f"Failed to download PDF (HTTP {response.status}). "
+                "The UTCN server may be blocking requests from this network. "
+                "Please run this application from a local machine on a Romanian network."
+            )
+            return
+
         self.logger.info("PDF downloaded. Extracting table data using pdfplumber...")
         pdf_file = BytesIO(response.body)
         courses = []
