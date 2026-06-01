@@ -1,17 +1,17 @@
 """
 PDF scraping and parsing functionality for UTCN curriculum documents.
 """
+
 import re
 from io import BytesIO
-from urllib.parse import quote
 from typing import List
+from urllib.parse import quote
 
 import pdfplumber
 import scrapy
 from scrapy.crawler import CrawlerProcess
 
 from models import Course
-
 
 # Global list to store courses extracted from the PDF.
 _scraped_courses = []
@@ -21,6 +21,7 @@ class CurriculumPDFSpider(scrapy.Spider):
     """
     Scrapy spider to download and parse UTCN curriculum PDFs.
     """
+
     name = "curriculum_pdf"
 
     def __init__(self, study_year, specialization, **kwargs):
@@ -36,7 +37,7 @@ class CurriculumPDFSpider(scrapy.Spider):
         self.academic_year = "2024-2025"  # Hardcoded academic year
         super().__init__(**kwargs)
 
-    def start_requests(self):
+    async def start(self):
         """Generate the initial request to download the PDF."""
         # Mapping from specialization to URL string
         spec_map = {
@@ -74,13 +75,21 @@ class CurriculumPDFSpider(scrapy.Spider):
         # Use headers to mimic a browser
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/115.0 Safari/537.36",
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/115.0 Safari/537.36",
             "Referer": "https://ac.utcluj.ro/planuri-de-invatamant.html",
         }
         yield scrapy.Request(
-            encoded_url, callback=self.parse_pdf, headers=headers, dont_filter=True
+            encoded_url,
+            callback=self.parse_pdf,
+            errback=self.errback_pdf,
+            headers=headers,
+            dont_filter=True,
+            meta={"handle_httpstatus_list": [403, 404, 500]},
         )
+
+    def errback_pdf(self, failure):
+        self.logger.error(f"Request failed: {failure.value}")
 
     def parse_pdf(self, response):
         """
@@ -89,6 +98,14 @@ class CurriculumPDFSpider(scrapy.Spider):
         Args:
             response: The Scrapy response containing the PDF data
         """
+        if response.status != 200:
+            self.logger.error(
+                f"Failed to download PDF (HTTP {response.status}). "
+                "The UTCN server may be blocking requests from this network. "
+                "Please run this application from a local machine on a Romanian network."
+            )
+            return
+
         self.logger.info("PDF downloaded. Extracting table data using pdfplumber...")
         pdf_file = BytesIO(response.body)
         courses = []
