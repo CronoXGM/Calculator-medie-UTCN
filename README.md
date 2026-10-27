@@ -4,13 +4,13 @@ A modular Python application for scraping course information from UTCN (Technica
 
 ## Features
 
-- 📚 **Curriculum Scraping**: Automatically downloads and extracts course data from official UTCN curriculum PDF files
-- ✅ **Interactive Subject Selection**: Choose which courses to include using intuitive checkbox UI
-- 🧮 **Grade Calculator**: Computes weighted harmonic mean with special handling for failing grades
-- 🎯 **Multiple Specializations**: Supports CTI, CTI_EN, AU, and AU_EN specializations
-- 📊 **Academic Year Support**: Currently configured for 2024-2025 academic year
-- 🔍 **Intelligent PDF Parsing**: Uses pdfplumber for accurate table extraction from PDF documents
-- 🏗️ **Modular Architecture**: Clean separation of concerns for maintainability and testing
+- **Curriculum Scraping**: Automatically downloads and extracts course data from official UTCN curriculum PDF files
+- **Interactive Subject Selection**: Choose which courses to include using intuitive checkbox UI
+- **Grade Calculator**: Computes weighted harmonic mean with special handling for failing grades
+- **Multiple Specializations**: Supports CTI, CTI_EN, AU, and AU_EN specializations
+- **Academic Year Support**: Currently configured for 2024-2025 academic year
+- **Intelligent PDF Parsing**: Uses pdfplumber for accurate table extraction from PDF documents
+- **Modular Architecture**: Clean separation of concerns for maintainability and testing
 
 ## Supported Specializations
 
